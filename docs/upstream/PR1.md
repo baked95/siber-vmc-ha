@@ -1,33 +1,36 @@
-# PR 1 draft — pyairios: model-aware bridge layer
+# PR 1 — pyairios: Ethernet bridge
 
-**Only write this after the maintainer answers the API question in the issue.**
-What follows is the version of the change I would send if he picks option 3
-(probe the product ID, allow an override). All the facts below are confirmed
-against real hardware — see the probe output in `ISSUE.md`.
+⚠️ ACTUALIZADO (13-ago): silverailscolo ya tiene una rama con el modelo de la
+pasarela TCP: `silverailscolo/pyairios@eb-orcon-model`. Añade
+`models/brdg_02em23.py` y elige el modelo según el transporte (opción 1 de las
+tres que planteamos en el issue). NO hay que escribir el PR desde cero: hay que
+completar sus tres TODOs, todos verificables con nuestro hardware.
 
-**Branch:** `ethernet-bridge-support`
-**Title:** Select the bridge model from the reported product ID; add BRDG-02EM23
+## Lo que falta en su rama
 
-## Description to paste in the PR
+| # | Qué | Valor correcto |
+|---|---|---|
+| 1 | `ProductId.BRDG_02EM23 = 0x0001C800  # TODO fill in a verified ID` | **`0x0001C848`** (116808), leído del registro 40002 |
+| 2 | `DEFAULT_DEVICE_ID = 207` en `models/brdg_02em23.py` (y el default de `Airios.__init__`) | **1** para la pasarela Ethernet |
+| 3 | El modelo Ethernet copia los registros de serie `41998`-`42001` (paridad, stop bits, baudrate, modbus id) + sus getters/setters | Quitarlos: la pasarela responde `IllegalDataAddress` y como `fetch()` recorre todos los registros legibles, **rompe cualquier fetch** |
 
-Follow-up to #<issue>. The TCP transport already worked; what stopped the
-Ethernet bridge (`BRDG-02EM23`, Siber `DFEVORFETH`) from being usable was the
-bridge layer:
+Nada más falló. `nodes()` ya funciona por TCP y la unidad (`VMD-02RPS78`) está
+modelada de antes.
 
-* `Airios.__init__` hard-codes `BRDG02R13` with `DEFAULT_DEVICE_ID = 207`
-* `ProductId` had no entry for the Ethernet bridge
-* the RS485 register set includes serial-only registers that do not exist there
+## Cómo probarlo
 
-This PR introduces a small bridge base class, moves the RS485-specific bits into
-`BRDG02R13`, adds `BRDG02EM23`, and selects the model from the product ID read
-at connect time (with an explicit override for offline construction). Tested
-against real hardware: `BRDG-02EM23` firmware 0x0712 with a bound
-`VMD-02RPS78-2`, on Modbus ids 1 and 2.
+`tools/test_eb_branch.py` instala su rama, aplica los tres parches y sondea el
+hardware. Con esa salida se comenta en el issue (`COMMENT-issue-13-followup.md`)
+y, si lo prefieren, se manda como PR contra su rama.
 
-No behaviour change for existing RS485 users: same class, same default device
-id, same registers.
+---
 
-## Shape of the change
+## (Referencia) diseño alternativo que propusimos en el issue
+
+Por si el mantenedor prefiere seleccionar el modelo leyendo el product ID en
+lugar de deducirlo del transporte:
+
+
 
 **`constants.py`** — new product ID (exact value from the hardware probe):
 
