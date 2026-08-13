@@ -25,7 +25,12 @@ model-aware so the Ethernet bridge is recognised", plus a docs fix.
    the RS485 bridge) and name `BRDG-02EM23`; `nodes()` discovers the unit
    correctly on Modbus id 2; `fetch()` fails only on the RS485-specific
    registers `41998`-`42001`.
-2. Post `ISSUE.md` — it is ready as written.
+2. **There is already an open issue for this**: scabrero/pyairios#13
+   ("TCP support", opened 2026-03-29 by @silverailscolo, unanswered) asks
+   literally "what extra changes would be required?" — with a user who has a
+   `BRDG-02EM23` but apparently cannot test it. So the move is to *answer there*,
+   not to open a duplicate: post `COMMENT-issue-13.md`.
+   `ISSUE.md` is kept only as a fallback in case #13 gets closed as stale.
 3. Wait for the maintainer's preference on API shape before coding (`PR1.md`
    proposes one, but it is his call).
 4. `PR1.md` → pyairios. `PR2.md` → the HA component.
