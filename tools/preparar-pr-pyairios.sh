@@ -20,7 +20,17 @@ gh auth status >/dev/null 2>&1 || { echo "Ejecuta primero: gh auth login"; exit 
 echo ">> 1) Fork y clon"
 mkdir -p "$(dirname "$WORK")"
 if [ ! -d "$WORK/.git" ]; then
-  gh repo fork scabrero/pyairios --clone=false --remote=false >/dev/null 2>&1 || true
+  if ! gh repo view "$USER/pyairios" >/dev/null 2>&1; then
+    echo "   creando el fork..."
+    gh repo fork scabrero/pyairios --clone=false
+    # el fork es asíncrono: esperar a que exista de verdad
+    for i in $(seq 1 20); do
+      gh repo view "$USER/pyairios" >/dev/null 2>&1 && break
+      sleep 3
+      [ "$i" = "20" ] && { echo "El fork no aparece. Créalo a mano en GitHub y reintenta."; exit 1; }
+    done
+  fi
+  echo "   clonando $USER/pyairios"
   git clone "https://github.com/$USER/pyairios.git" "$WORK"
 fi
 cd "$WORK"
@@ -89,6 +99,30 @@ if not changes:
 for c in changes:
     print(f"   · {c}")
 PY
+
+echo
+echo ">> 3b) README: hardware probado"
+python3 - <<'PY2'
+import pathlib
+r = pathlib.Path("README.md")
+t = r.read_text()
+old_unit = "* [Siber DF Optima 2](https://www.siberzone.es/descarga/siber-df-optima-2-19170/) ([Airios VMD-02RPS78](https://www.airios.eu/vmd-heat-recovery-unit-controller))"
+new = ("* [Siber DF Evo 2 / DF Optima 2](https://www.siberzone.es/descarga/siber-df-optima-2-19170/) "
+       "([Airios VMD-02RPS78](https://www.airios.eu/vmd-heat-recovery-unit-controller))")
+if old_unit in t:
+    t = t.replace(old_unit, new)
+    print("   · unidad: DF Optima 2 -> DF Evo 2 / DF Optima 2")
+bridge = ("* Siber DFEVORFETH Ethernet bridge "
+          "([Airios BRDG-02EM23](https://www.airios.eu/brdg-02em23)), Modbus-TCP")
+if "BRDG-02EM23](https://www.airios.eu/brdg-02em23)), Modbus-TCP" not in t:
+    marker = "* [Orcon generic](https://www.orcon.nl/)"
+    idx = t.find(marker)
+    end = t.find("\n", idx)
+    t = t[:end + 1] + bridge + "\n" + t[end + 1:]
+    print("   · pasarela Ethernet BRDG-02EM23 añadida a dispositivos probados")
+r.write_text(t)
+PY2
+git diff --stat README.md || true
 
 echo
 echo ">> 4) Comprobación rápida de sintaxis"

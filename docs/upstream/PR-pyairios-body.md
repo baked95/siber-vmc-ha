@@ -53,6 +53,21 @@ fetch(all_props=False, with_status=False)   → node 1: 60 props, node 2: 52 pro
 fetch(all_props=True,  with_status=True)    → node 1: 76 props, node 2: 79 props
 ```
 
+## README
+
+Also updated the *Supported devices* list: the tested unit is a **Siber DF Evo 2**
+(the bridge reports the bound node's description as
+`['Siber DF Evo', 'Siber DF Optima 2']`, same `VMD-02RPS78` controller), and added
+the Ethernet bridge itself — sold by Siber as **DFEVORFETH** — since that is the
+piece this PR is about.
+
+One thing I noticed while doing that, and I may well be misreading it: the Orcon
+line lists `Airios VMD-02EM23-2`, but `EM23` looks like the bridge family rather
+than a unit controller, and the branch's new unit model is `vmd_15rms86.py` /
+`ProductId.VMD_15RPS86`. Should that line say `VMD-15RPS86`? I've left it
+untouched in case it is intentional. (Tiny related nit: the module is named
+`vmd_15rms86.py` — RMS — while the enum says `VMD_15RPS86` — RPS.)
+
 No behaviour change for RS485 users: `BRDG02R13` keeps its own registers and its
 `DEFAULT_DEVICE_ID = 207`.
 
