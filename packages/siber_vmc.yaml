@@ -1,0 +1,369 @@
+# =============================================================================
+#  Siber DF EVO / Airios BRDG-02EM23 — Home Assistant package
+#  Local Modbus TCP control. No cloud, no vendor app required.
+#
+#  SETUP
+#   1. Configure the bridge WITHOUT cloud → see docs/BRIDGE_SETUP.md
+#   2. Copy this file to  config/packages/siber_vmc.yaml
+#   3. Make sure configuration.yaml has:
+#          homeassistant:
+#            packages: !include_dir_named packages
+#   4. Replace BRIDGE_IP below with your bridge address, then restart HA.
+#   5. Turn on input_boolean.vmc_auto if you want the automations to act.
+#
+#  NOTES (hard-won, see docs/REGISTERS.md)
+#   * Register addressing is LITERAL (41000, no 40001/40000 offset).
+#   * Floats are float32 with SWAPPED WORDS  → data_type: float32 + swap: word
+#   * The unit is Modbus device/slave 2; the bridge itself is 1.
+#   * The bridge accepts only ONE Modbus connection at a time. Close the
+#     "BRDG Modbus Tester" tool before using HA, and vice versa.
+#   * Register 41500 (requested speed) is WRITE-ONLY on some units: read the
+#     actual speed from 41000 instead.
+#   * Some registers are cached: the FIRST read may fail and the second returns
+#     a value (filter days/percentage, error code). Harmless.
+# =============================================================================
+
+modbus:
+  - name: vmc
+    type: tcp
+    host: BRIDGE_IP          # <-- CHANGE ME (e.g. 192.168.1.50)
+    port: 502
+    timeout: 5
+    message_wait_milliseconds: 50
+    delay: 2
+    sensors:
+      - name: "VMC speed raw"
+        unique_id: vmc_speed_raw
+        slave: 2
+        address: 41000
+        data_type: uint16
+        scan_interval: 10
+
+      - name: "VMC error code"
+        unique_id: vmc_error_code
+        slave: 2
+        address: 41003
+        data_type: uint16
+        scan_interval: 300
+
+      - name: "VMC indoor temperature"
+        unique_id: vmc_indoor_temperature
+        slave: 2
+        address: 41005
+        data_type: float32
+        swap: word
+        precision: 1
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+        scan_interval: 60
+
+      - name: "VMC outdoor temperature"
+        unique_id: vmc_outdoor_temperature
+        slave: 2
+        address: 41007
+        data_type: float32
+        swap: word
+        precision: 1
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+        scan_interval: 60
+
+      - name: "VMC exhaust temperature"
+        unique_id: vmc_exhaust_temperature
+        slave: 2
+        address: 41009
+        data_type: float32
+        swap: word
+        precision: 1
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+        scan_interval: 60
+
+      - name: "VMC supply temperature"
+        unique_id: vmc_supply_temperature
+        slave: 2
+        address: 41011
+        data_type: float32
+        swap: word
+        precision: 1
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+        scan_interval: 60
+
+      - name: "VMC inlet flow"
+        unique_id: vmc_inlet_flow
+        slave: 2
+        address: 41019
+        data_type: float32
+        swap: word
+        precision: 0
+        unit_of_measurement: "m³/h"
+        state_class: measurement
+        scan_interval: 60
+
+      - name: "VMC exhaust flow"
+        unique_id: vmc_exhaust_flow
+        slave: 2
+        address: 41021
+        data_type: float32
+        swap: word
+        precision: 0
+        unit_of_measurement: "m³/h"
+        state_class: measurement
+        scan_interval: 60
+
+      - name: "VMC bypass position"
+        unique_id: vmc_bypass_position
+        slave: 2
+        address: 41016
+        data_type: uint16
+        unit_of_measurement: "%"
+        state_class: measurement
+        scan_interval: 120
+
+      - name: "VMC defrosting raw"
+        unique_id: vmc_defrosting_raw
+        slave: 2
+        address: 41015
+        data_type: uint16
+        scan_interval: 300
+
+      - name: "VMC filter dirty raw"
+        unique_id: vmc_filter_dirty_raw
+        slave: 2
+        address: 41014
+        data_type: uint16
+        scan_interval: 3600
+
+      - name: "VMC filter days remaining"
+        unique_id: vmc_filter_days_remaining
+        slave: 2
+        address: 41040
+        data_type: uint16
+        unit_of_measurement: "d"
+        scan_interval: 3600
+
+      - name: "VMC filter percentage"
+        unique_id: vmc_filter_percentage
+        slave: 2
+        address: 41042
+        data_type: uint16
+        unit_of_measurement: "%"
+        scan_interval: 3600
+
+      # Optional: sensors below are NOT available on every unit.
+      # A value of 239 (0xEF) or 32767 (0x7FFF) means "not available".
+      # Uncomment only if your unit has the matching sensor installed.
+      # - name: "VMC indoor humidity"
+      #   unique_id: vmc_indoor_humidity
+      #   slave: 2
+      #   address: 41017
+      #   data_type: uint16
+      #   unit_of_measurement: "%"
+      #   device_class: humidity
+      #   scan_interval: 120
+      # - name: "VMC CO2"
+      #   unique_id: vmc_co2
+      #   slave: 2
+      #   address: 41025
+      #   data_type: uint16
+      #   unit_of_measurement: "ppm"
+      #   device_class: carbon_dioxide
+      #   scan_interval: 120
+
+input_boolean:
+  vmc_auto:
+    name: VMC automatic control
+    icon: mdi:fan-auto
+
+input_number:
+  vmc_boost_minutes:
+    name: VMC boost minutes
+    icon: mdi:timer-outline
+    min: 5
+    max: 120
+    step: 5
+    unit_of_measurement: min
+    mode: slider
+
+input_select:
+  vmc_speed:
+    name: VMC speed
+    icon: mdi:fan
+    options:
+      - "Off"
+      - Away
+      - Low
+      - Nominal
+      - High
+      - Boost
+  vmc_bypass:
+    name: VMC bypass
+    icon: mdi:valve
+    options:
+      - Auto
+      - Closed
+      - Open
+
+template:
+  - sensor:
+      - name: "VMC speed"
+        unique_id: vmc_speed_text
+        icon: mdi:fan
+        state: >
+          {% set v = states('sensor.vmc_speed_raw') | int(-1) %}
+          {% if v == 0 %}Off
+          {% elif v == 1 %}Low
+          {% elif v == 2 %}Medium
+          {% elif v == 3 %}High
+          {% elif v in [11,12,13] %}Timer
+          {% elif v == 21 %}Away
+          {% elif v == 23 %}Boost
+          {% elif v == 24 %}Auto
+          {% else %}Unknown{% endif %}
+
+      - name: "VMC heat recovery"
+        unique_id: vmc_heat_recovery
+        unit_of_measurement: "%"
+        state_class: measurement
+        availability: >
+          {{ states('sensor.vmc_outdoor_temperature') not in ['unknown','unavailable']
+             and states('sensor.vmc_supply_temperature') not in ['unknown','unavailable']
+             and states('sensor.vmc_indoor_temperature') not in ['unknown','unavailable'] }}
+        state: >
+          {% set ext = states('sensor.vmc_outdoor_temperature') | float(0) %}
+          {% set sup = states('sensor.vmc_supply_temperature') | float(0) %}
+          {% set ind = states('sensor.vmc_indoor_temperature') | float(0) %}
+          {% if (ind - ext) | abs < 0.5 %}0
+          {% else %}{{ (((sup - ext) / (ind - ext)) * 100) | round(0) }}{% endif %}
+
+  - binary_sensor:
+      - name: "VMC filter dirty"
+        unique_id: vmc_filter_dirty
+        device_class: problem
+        state: "{{ states('sensor.vmc_filter_dirty_raw') | int(0) == 1 }}"
+
+      - name: "VMC running"
+        unique_id: vmc_running
+        icon: mdi:fan
+        state: "{{ states('sensor.vmc_speed_raw') | int(0) > 0 }}"
+
+      - name: "VMC defrosting"
+        unique_id: vmc_defrosting
+        icon: mdi:snowflake-melt
+        state: "{{ states('sensor.vmc_defrosting_raw') | int(0) == 1 }}"
+
+script:
+  vmc_boost:
+    alias: "VMC: timed boost"
+    icon: mdi:fan-plus
+    mode: restart
+    sequence:
+      - variables:
+          previous: "{{ states('input_select.vmc_speed') }}"
+          minutes: "{{ states('input_number.vmc_boost_minutes') | int(30) }}"
+      - action: input_select.select_option
+        target: { entity_id: input_select.vmc_speed }
+        data: { option: Boost }
+      - delay: { minutes: "{{ minutes }}" }
+      - action: input_select.select_option
+        target: { entity_id: input_select.vmc_speed }
+        data: { option: "{{ 'Nominal' if previous == 'Boost' else previous }}" }
+
+  vmc_reset_filter:
+    alias: "VMC: reset filter timer"
+    icon: mdi:air-filter
+    description: Run ONLY after cleaning or replacing the filter
+    mode: single
+    sequence:
+      - action: modbus.write_register
+        data: { hub: vmc, slave: 2, address: 42000, value: 0 }
+      - delay: { seconds: 5 }
+      - action: homeassistant.update_entity
+        target:
+          entity_id:
+            - sensor.vmc_filter_dirty_raw
+            - sensor.vmc_filter_days_remaining
+            - sensor.vmc_filter_percentage
+
+automation:
+  - id: vmc_write_speed
+    alias: "VMC: apply selected speed"
+    description: Writes register 41500 when the selector changes
+    triggers:
+      - trigger: state
+        entity_id: input_select.vmc_speed
+    conditions:
+      - condition: template
+        value_template: "{{ trigger.from_state.state != trigger.to_state.state }}"
+    actions:
+      - variables:
+          map: { "Off": 0, Away: 1, Low: 2, Nominal: 3, High: 4, Boost: 7 }
+      - action: modbus.write_register
+        data:
+          hub: vmc
+          slave: 2
+          address: 41500
+          value: "{{ map[trigger.to_state.state] }}"
+      - delay: { seconds: 3 }
+      - action: homeassistant.update_entity
+        target: { entity_id: sensor.vmc_speed_raw }
+    mode: single
+
+  - id: vmc_write_bypass
+    alias: "VMC: apply bypass mode"
+    triggers:
+      - trigger: state
+        entity_id: input_select.vmc_bypass
+    conditions:
+      - condition: template
+        value_template: "{{ trigger.from_state.state != trigger.to_state.state }}"
+    actions:
+      - variables:
+          map: { Auto: 255, Closed: 0, Open: 100 }
+      - action: modbus.write_register
+        data:
+          hub: vmc
+          slave: 2
+          address: 41550
+          value: "{{ map[trigger.to_state.state] }}"
+      - delay: { seconds: 3 }
+      - action: homeassistant.update_entity
+        target: { entity_id: sensor.vmc_bypass_position }
+    mode: single
+
+  - id: vmc_filter_alert
+    alias: "VMC: dirty filter alert"
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.vmc_filter_dirty
+        to: "on"
+        for: { minutes: 10 }
+    actions:
+      - action: persistent_notification.create
+        data:
+          title: VMC filter
+          message: >
+            The ventilation unit reports a dirty filter
+            ({{ states('sensor.vmc_filter_days_remaining') }} days left).
+          notification_id: vmc_filter
+    mode: single
+
+  - id: vmc_error_alert
+    alias: "VMC: error code alert"
+    triggers:
+      - trigger: numeric_state
+        entity_id: sensor.vmc_error_code
+        above: 0
+        for: { minutes: 5 }
+    actions:
+      - action: persistent_notification.create
+        data:
+          title: VMC error
+          message: "The unit reports error code {{ states('sensor.vmc_error_code') }}."
+          notification_id: vmc_error
+    mode: single
